@@ -1,7 +1,7 @@
 # IM_XMPP
 使用了XMPPFrame和JFKit工具；
 
-
+![image](https://github.com/fjlprivate/IM_XMPP/blob/master/Simulator%20Screen%20Shot%20-%20iPhone%2011%20Pro%20-%202019-11-26%20at%2014.09.03.png)
 
 # 使用
 
