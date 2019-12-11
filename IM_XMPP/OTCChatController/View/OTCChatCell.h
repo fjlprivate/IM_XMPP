@@ -33,8 +33,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 // 布局对象
 @property (nonatomic, strong) OTCM_messageLayouts* layouts;
-// 气泡
-@property (nonatomic, strong) UIImageView* bubbleImageView;
 // 代理
 @property (nonatomic, weak) id<OTCChatCellDelegate> delegate;
 

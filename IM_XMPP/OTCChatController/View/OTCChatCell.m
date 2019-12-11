@@ -38,8 +38,6 @@ static CGFloat const QQBubbleInset = 3;
         [self.asynvView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.edges.mas_equalTo(UIEdgeInsetsZero);
         }];
-        [self.asynvView addSubview:self.bubbleImageView];
-        [self.asynvView sendSubviewToBack:self.bubbleImageView];
     }
     return self;
 }
@@ -61,16 +59,6 @@ static CGFloat const QQBubbleInset = 3;
         self.imgSendError.frame = self.layouts.flagFrame;
         self.vActivity.frame = self.layouts.flagFrame;
         self.imgSendError.hidden = self.layouts.status != OTCMMessageStatusSendFail;
-        // 发送方
-        if (self.layouts.isSender) {
-            self.bubbleImageView.image = [[UIImage imageNamed:@"paopao_blue"] resizableImageWithCapInsets:resizeInset resizingMode:UIImageResizingModeStretch];
-        }
-        // 接收方
-        else {
-            self.bubbleImageView.image = [[UIImage imageNamed:@"paopao_bai"] resizableImageWithCapInsets:resizeInset resizingMode:UIImageResizingModeStretch];
-        }
-        self.bubbleImageView.hidden = self.layouts.bubbleHidden;
-        self.bubbleImageView.frame = CGRectInset(self.layouts.bubbleFrame, -JFScaleWidth6(QQBubbleInset), -JFScaleWidth6(QQBubbleInset));
     }];
 }
 
@@ -99,6 +87,13 @@ static CGFloat const QQBubbleInset = 3;
         }
     }
 }
+- (void)didLongPressAtAsyncView {
+    if (self.layouts.message && self.layouts.message.messageBodyType == OTCMMessageBodyTypeText) {
+        if (self.delegate && [self.delegate respondsToSelector:@selector(didLongpressedContentTextInchatCell:)]) {
+            [self.delegate didLongpressedContentTextInchatCell:self];
+        }
+    }
+}
 
 
 /**
@@ -120,19 +115,102 @@ static CGFloat const QQBubbleInset = 3;
     }
 }
 
+/// 即将开始绘制
+/// @param asyncView  当前异步加载视图
+/// @param context  当前即将绘制的上下文
+/// @param cancelled  退出绘制的回调；在外部绘制时，要不时判断当前绘制是否结束
+- (void) asyncView:(JFAsyncView*)asyncView willDrawInContext:(CGContextRef)context cancelled:(IsCancelled)cancelled {
+    // 取昵称文本属性+文本属性|图片属性
+    JFTextLayout* txt_nickname = nil;
+    JFTextLayout* txt_content = nil;
+    JFImageLayout* img_content = nil;
+    for (JFTextLayout* layout in self.layouts.layouts) {
+        if ([layout isKindOfClass:[JFTextLayout class]] && layout.tag == OTCMMessageLayoutsTagNickName) {
+            txt_nickname = layout;
+        }
+        else if ([layout isKindOfClass:[JFTextLayout class]] && layout.tag == OTCMMessageLayoutsTagText) {
+            txt_content = layout;
+        }
+        else if ([layout isKindOfClass:[JFImageLayout class]] && layout.tag == OTCMMessageLayoutsTagImage) {
+            img_content = (JFImageLayout*)layout;
+        }
+    }
+
+    CGContextSaveGState(context);
+    
+    // 绘制头像的背景色
+    CGFloat cornerRadius = JFScaleWidth6(kOTCCornerRadius);
+    
+    CGMutablePathRef path = CGPathCreateMutable();
+    // 绘制昵称背景色
+    CGRect frame = self.layouts.nickNameFrame;
+    CGPathAddRoundedRect(path, NULL, frame, JFScaleWidth6(kOTCAvatarWidth * 0.5), JFScaleWidth6(kOTCAvatarWidth * 0.5));
+    CGContextAddPath(context, path);
+    if (txt_nickname) {
+        CGContextSetFillColorWithColor(context, txt_nickname.backgroundColor.CGColor);
+    } else {
+        CGContextSetFillColorWithColor(context, [UIColor orangeColor].CGColor);
+    }
+    CGContextFillPath(context);
+    CGPathRelease(path);
+    
+    // 发送方
+    if (self.layouts.isSender) {
+        // 绘制文本内容气泡
+        if (txt_content) {
+            CGFloat startX = CGRectGetMinX(self.layouts.bubbleFrame);
+            CGFloat startY = CGRectGetMinY(self.layouts.bubbleFrame) ;
+            CGFloat width = CGRectGetWidth(self.layouts.bubbleFrame);
+            CGFloat height = CGRectGetHeight(self.layouts.bubbleFrame);
+            path = CGPathCreateMutable();
+            CGPathMoveToPoint(path, NULL, startX + width, startY);
+            CGPathAddLineToPoint(path, NULL, startX + width, startY + height - cornerRadius);
+            CGPathAddArc(path, NULL, startX + width - cornerRadius, startY + height - cornerRadius, cornerRadius, M_PI * 0, M_PI * 0.5, NO);
+            CGPathAddLineToPoint(path, NULL, startX + cornerRadius, startY + height);
+            CGPathAddArc(path, NULL, startX + cornerRadius, startY + height - cornerRadius, cornerRadius, M_PI * 0.5, M_PI * 1, NO);
+            CGPathAddLineToPoint(path, NULL, startX, startY + cornerRadius);
+            CGPathAddArc(path, NULL, startX + cornerRadius, startY + cornerRadius, cornerRadius, M_PI * 1, M_PI * 1.5, NO);
+            CGPathAddLineToPoint(path, NULL, startX + width, startY);
+            CGContextAddPath(context, path);
+            CGContextSetFillColorWithColor(context, txt_content.backgroundColor.CGColor);
+            CGContextFillPath(context);
+            CGPathRelease(path);
+        }
+    }
+    // 接收方
+    else {
+        // 绘制文本内容气泡
+        if (txt_content) {
+            CGFloat startX = CGRectGetMinX(self.layouts.bubbleFrame);
+            CGFloat startY = CGRectGetMinY(self.layouts.bubbleFrame) ;
+            CGFloat width = CGRectGetWidth(self.layouts.bubbleFrame);
+            CGFloat height = CGRectGetHeight(self.layouts.bubbleFrame);
+            path = CGPathCreateMutable();
+            CGPathMoveToPoint(path, NULL, startX, startY);
+            CGPathAddLineToPoint(path, NULL, startX + width - cornerRadius, startY);
+            CGPathAddArc(path, NULL, startX + width - cornerRadius, startY + cornerRadius, cornerRadius, M_PI * 1.5, M_PI * 2, NO);
+            CGPathAddLineToPoint(path, NULL, startX + width, startY + height - cornerRadius);
+            CGPathAddArc(path, NULL, startX + width - cornerRadius, startY + height - cornerRadius, cornerRadius, M_PI * 0, M_PI * 0.5, NO);
+            CGPathAddLineToPoint(path, NULL, startX + cornerRadius, startY + height);
+            CGPathAddArc(path, NULL, startX + cornerRadius, startY + height - cornerRadius, cornerRadius, M_PI * 0.5, M_PI * 1, NO);
+            CGPathAddLineToPoint(path, NULL, startX, startY);
+            CGContextAddPath(context, path);
+            CGContextSetFillColorWithColor(context, txt_content.backgroundColor.CGColor);
+            CGContextFillPath(context);
+            CGPathRelease(path);
+        }
+    }
+    
+    CGContextRestoreGState(context);
+}
 
 
 # pragma mark - getter
-- (UIImageView *)bubbleImageView {
-    if (!_bubbleImageView) {
-        _bubbleImageView = [UIImageView new];
-    }
-    return _bubbleImageView;
-}
 
 - (JFAsyncView *)asynvView {
     if (!_asynvView) {
         _asynvView = [JFAsyncView new];
+        _asynvView.delegate = self;
     }
     return _asynvView;
 }

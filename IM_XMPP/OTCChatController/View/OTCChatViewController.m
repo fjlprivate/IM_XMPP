@@ -22,6 +22,7 @@
 #import <IQKeyboardManager.h>
 #import <MBProgressHUD.h>
 #import "OTCChatToolView.h"
+#import <YBImageBrowser.h>
 
 
 
@@ -59,6 +60,7 @@
 - (void) loadEarlierMessages {
     WeakSelf(wself);
     [self.vmChat loadHistoryMessagesOnFinished:^(NSInteger messagesCount) {
+        [wself.tableView.mj_header endRefreshing];
         if (messagesCount > 0) {
             NSMutableArray* list = @[].mutableCopy;
             for (NSInteger row = 0; row < messagesCount; row++) {
@@ -69,7 +71,6 @@
                 [wself.tableView scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:messagesCount - 1 inSection:0] atScrollPosition:UITableViewScrollPositionTop animated:NO];
             }];
         }
-        [wself.tableView.mj_header endRefreshing];
     } orFailed:^(NSError * _Nonnull error) {
         [wself.tableView.mj_header endRefreshing];
     }];
@@ -217,7 +218,7 @@
     WeakSelf(wself);
     // 发送消息
     NSArray* indexes = [self.vmChat sendMessageWithText:text onFinished:^(NSInteger index) {
-        [wself delayReloadingMessageAtIndex:index];
+//        [wself delayReloadingMessageAtIndex:index];
     } orFailed:^(NSInteger index, NSError * _Nonnull error) {
         [wself delayReloadingMessageAtIndex:index];
     }];
@@ -228,7 +229,7 @@
     WeakSelf(wself);
     // 发送消息
     NSArray* indexes = [self.vmChat sendMessageWithImage:image onFinished:^(NSInteger index) {
-        [wself delayReloadingMessageAtIndex:index];
+//        [wself delayReloadingMessageAtIndex:index];
     } orFailed:^(NSInteger index, NSError * _Nonnull error) {
         [wself delayReloadingMessageAtIndex:index];
     }];
@@ -248,11 +249,24 @@
     [self.tableView scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:latestIndex inSection:0] atScrollPosition:UITableViewScrollPositionBottom animated:YES];
 }
 
+// 重发
+- (void) resendMessageAtCell:(OTCChatCell*)cell {
+    NSInteger index = cell.tag;
+    OTCM_message* message = [self.vmChat messageAtIndex:index];
+    @weakify(self);
+    [self.vmChat resendMessage:message onFinished:^(NSInteger index) {
+        @strongify(self);
+        [self.tableView reloadRow:index inSection:0 withRowAnimation:UITableViewRowAnimationFade];
+    } orFailed:^(NSInteger index, NSError * _Nonnull error) {
+        
+    }];
+}
+
 // 延迟重载消息,防止阻塞动画
 - (void) delayReloadingMessageAtIndex:(NSInteger)index {
     if (index != NSNotFound) {
         [UIView performWithoutAnimation:^{
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                 [self.tableView reloadRowAtIndexPath:[NSIndexPath indexPathForRow:index inSection:0] withRowAnimation:UITableViewRowAnimationNone];
             });
         }];
@@ -330,33 +344,11 @@
         return cell;
     }
 }
-//- (void)scrollViewDidScroll:(UIScrollView *)scrollView {
-//    [self.view endEditing:YES];
-//}
-
-//- (BOOL)tableView:(UITableView *)tableView shouldShowMenuForRowAtIndexPath:(NSIndexPath *)indexPath {
-//    OTCM_message* message = [self.vmChat messageAtIndex:indexPath.row];
-//    return message.messageBodyType == OTCMMessageBodyTypeText;
-//}
-//- (BOOL)tableView:(UITableView *)tableView canPerformAction:(SEL)action forRowAtIndexPath:(NSIndexPath *)indexPath withSender:(id)sender {
-//    return action == @selector(copy:);
-//}
-//- (void)tableView:(UITableView *)tableView performAction:(SEL)action forRowAtIndexPath:(NSIndexPath *)indexPath withSender:(id)sender {
-//    if (action == @selector(copy:)) {
-//        OTCM_message* message = [self.vmChat messageAtIndex:indexPath.row];
-//        if (message.messageBodyType == OTCMMessageBodyTypeText) {
-//            OTCM_messageBodyText* body = (OTCM_messageBodyText*)message.messageBody;
-//            [UIPasteboard generalPasteboard].string = body.text;
-//            [MBProgressHUD AP_showSuccess:NSLocalizedString(@"已拷贝", nil)];
-//        }
-//    }
-//}
 
 # pragma mark - 回调:OTCChatCellDelegate
 // 点击了头像
 - (void) didClickedAvatorInchatCell:(OTCChatCell*)cell {
-//    OTCM_message* message = [self.vmChat messageAtIndex:cell.tag];
-    // 处理...
+    
 }
 // 点击了正文图片
 - (void) didClickedImageInchatCell:(OTCChatCell*)cell {
@@ -373,44 +365,59 @@
     else { // UIImage|NSURL
         imageUrl = (NSURL*)image.imageUrl;
     }
-    JFImageBrowserItem* item = [JFImageBrowserItem jf_itemWithMediaType:JFMediaTypeNormalImage
-                                                              thumbnail:nil
-                                                        mediaDisplaying:imageUrl
-                                                            mediaOrigin:imageUrl
-                                                            originFrame:CGRectZero cornerRadius:0
-                                                              mediaSize:CGSizeMake(image.imageWidth, image.imageHeight)
-                                                      originContentMode:UIViewContentModeScaleAspectFit];
-    JFImageBrowserHandler* save = [JFImageBrowserHandler jf_handlerWithTitle:APLocalizedString(APLocalStringSavePicInLibrary) type:JFIBHandlerTypeDefault handle:^(NSInteger index) {
-        [JFHelper saveImageToPhotoLibrary:imageUrl onFinished:^(NSError *error) {
-            UIViewController* vc = JFCurrentViewController();
-            MBProgressHUD* hud = [MBProgressHUD showHUDAddedTo:vc.view animated:YES];
-            hud.mode = MBProgressHUDModeText;
-            hud.removeFromSuperViewOnHide = YES;
-            if (error) {
-                hud.label.text = error.localizedDescription;
-            } else {
-                hud.label.text = APLocalizedString(APLocalStringIsSaved);
-            }
-            [hud hideAnimated:YES afterDelay:1.5];
-        }];
-    }];
-    [JFImageBrowserViewController jf_showFromVC:self withImageList:@[item] andHandlers:@[save] startAtIndex:0];
-}
-// 点击了正文
-- (void) didClickedContentTextInchatCell:(OTCChatCell*)cell {
-//    OTCM_message* message = [self.vmChat messageAtIndex:cell.tag];
-    // 处理...
+    
+    YBImageBrowser* imageBrowser = [YBImageBrowser new];
+    YBIBImageData* imageData = [YBIBImageData new];
+    if ([image.imageUrl isKindOfClass:[NSString class]]) {
+        imageData.imageURL = [NSURL URLWithString:[APNetworkClientAPIBaseURLString stringByAppendingPathComponent:image.imageUrl]];
+    }
+    else if ([image.imageUrl isKindOfClass:[NSURL class]]) {
+        NSURL* url = (NSURL*)image.imageUrl;
+        if ([url isFileURL]) {
+            imageData.imagePath = url.absoluteString;
+        } else {
+            imageData.imageURL = url;
+        }
+    }
+//    imageData.projectiveView =
+    
+    imageBrowser.dataSourceArray = @[imageData];
+    imageBrowser.currentPage = 0;
+    [imageBrowser show];
+    
+    
+    
+//    JFImageBrowserItem* item = [JFImageBrowserItem jf_itemWithMediaType:JFMediaTypeNormalImage
+//                                                              thumbnail:nil
+//                                                        mediaDisplaying:imageUrl
+//                                                            mediaOrigin:imageUrl
+//                                                            originFrame:CGRectZero cornerRadius:0
+//                                                              mediaSize:CGSizeMake(image.imageWidth, image.imageHeight)
+//                                                      originContentMode:UIViewContentModeScaleAspectFit];
+//    JFImageBrowserHandler* save = [JFImageBrowserHandler jf_handlerWithTitle:APLocalizedString(APLocalStringSavePicInLibrary) type:JFIBHandlerTypeDefault handle:^(NSInteger index) {
+//        [JFHelper saveImageToPhotoLibrary:imageUrl onFinished:^(NSError *error) {
+//            UIViewController* vc = JFCurrentViewController();
+//            MBProgressHUD* hud = [MBProgressHUD showHUDAddedTo:vc.view animated:YES];
+//            hud.mode = MBProgressHUDModeText;
+//            hud.removeFromSuperViewOnHide = YES;
+//            if (error) {
+//                hud.label.text = error.localizedDescription;
+//            } else {
+//                hud.label.text = APLocalizedString(APLocalStringIsSaved);
+//            }
+//            [hud hideAnimated:YES afterDelay:1.5];
+//        }];
+//    }];
+//    [JFImageBrowserViewController jf_showFromVC:self withImageList:@[item] andHandlers:@[save] startAtIndex:0];
 }
 // 长按了正文
 - (void) didLongpressedContentTextInchatCell:(OTCChatCell*)cell {
-//    OTCM_message* message = [self.vmChat messageAtIndex:cell.tag];
-    // 处理...
+    // 提示拷贝
     [self showCopyAtCell:cell];
 }
-// 点击了重发图片
+// 点击了重发
 - (void) didClickedResendInchatCell:(OTCChatCell*)cell {
-//    OTCM_message* message = [self.vmChat messageAtIndex:cell.tag];
-    // 重发消息
+    [self resendMessageAtCell:cell];
 }
 
 
@@ -524,7 +531,6 @@
     self.tableView.frame = CGRectMake(0, JFNaviStatusBarHeight, JFSCREEN_WIDTH, CGRectGetMinY(self.toolBar.frame) - JFNaviStatusBarHeight);
     self.vToolMenu.frame = CGRectMake(0, JFSCREEN_HEIGHT, JFSCREEN_WIDTH, [OTCChatToolView viewHeight]);
     
-//    self.title = self.accountName;
     // 刷新对方用户信息
     [self refreshToUserInfo];
     // 刷新消息

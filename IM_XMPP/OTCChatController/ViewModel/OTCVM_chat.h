@@ -77,6 +77,13 @@ NS_ASSUME_NONNULL_BEGIN
                        onFinished:(void (^) (NSInteger index))finishedBlock
                          orFailed:(void (^) (NSInteger index, NSError* error))failedBlock;
 
+// 重发
+- (void) resendMessage:(OTCM_message*)message
+            onFinished:(void (^) (NSInteger index))finishedBlock
+              orFailed:(void (^) (NSInteger index, NSError* error))failedBlock;
+
+
+
 // 重置用户聊天的所有未读为已读
 - (void) resetAllUnread;
 

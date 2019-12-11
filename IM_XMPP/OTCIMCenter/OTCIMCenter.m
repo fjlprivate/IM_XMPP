@@ -93,8 +93,8 @@
  @param failedBlock 回调:失败<NSError>
  */
 - (void) im_reSendMessage:(OTCM_message*)message
-               onFinished:(void (^) (OTCM_message* message))finishedBlock
-                 orFailed:(void (^) (NSError* error))failedBlock
+//               onFinished:(void (^) (OTCM_message* message))finishedBlock
+//                 orFailed:(void (^) (NSError* error))failedBlock
 {
     // 未登录，不处理
     if (!self.isLogin) {
@@ -105,9 +105,10 @@
         }
         return;
     }
-    if (finishedBlock) {
-        finishedBlock(message);
-    }
+//    if (finishedBlock) {
+//        finishedBlock(message);
+//    }
+    [self sendMessageToServer:message];
 }
 
 /**

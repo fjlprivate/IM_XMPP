@@ -325,6 +325,15 @@
     return indexes;
 }
 
+- (void) resendMessage:(OTCM_message*)message
+            onFinished:(void (^) (NSInteger index))finishedBlock
+              orFailed:(void (^) (NSInteger index, NSError* error))failedBlock
+{
+    self.didSendMessage = finishedBlock;
+    self.didFailToSendMessage = failedBlock;
+    [self.imCenter im_reSendMessage:message];
+}
+
 
 
 
